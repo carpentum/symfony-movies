@@ -6,11 +6,12 @@
 
 {% block body %}
 
+	<h1>Woohooo.</h1>
 	{#{ _self }#}
-	{#{ _charset }#}
-{{ author }}
+{#{ _charset }#}
+	{#{ author }#}
 
 	{#% for movie in movies %}
-	        <li>{{ movie }}</li>
-	    {% endfor %#}
+			        <li>{{ movie }}</li>
+			    {% endfor %#}
 {% endblock %}

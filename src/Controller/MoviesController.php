@@ -3,41 +3,145 @@
 namespace App\Controller;
 
 use App\Entity\Movie;
+use App\Form\MovieFormType;
 use App\Repository\MovieRepository;
-use Doctrine\ORM\Mapping as ORM;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\File\Exception\FileException;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 
-#[ORM\Entity(repositoryClass: MovieRepository::class)]
 class MoviesController extends AbstractController
 {
 
     private $em;
-
-    public function __construct(EntityManagerInterface $em)
+    private $movieRepository;
+    public function __construct(MovieRepository $movieRepository, EntityManagerInterface $em)
     {
+        $this->movieRepository = $movieRepository;
         $this->em = $em;
     }
 
-    #[Route('/movies', name: 'movies',)]
+    #[Route('/movies/', name: 'movies',)]
     public function index(): Response
     {
-        // findAll() - SELECT * FROM movies
-        // find() - SELECT * FROM movies WHERE id = 8
-        // findBy() - SELECT * FROM movies ORDER BY id DESC
-        // findOneBy() - SELECT * FROM movies WHERE id = 7 AND title = 'The Dark Knight' ORDER BY id DESC
-        // count() - SELECT COUNT(*) FROM movies WHERE id = 7
+        $movies = $this->movieRepository->findAll();
 
-        // $respository = $this->em->getRepository(Movie::class);
+        return $this->render('movies/index.html.twig', [
+            'movies' => $movies
+        ]);
+    }
 
-        // // $movies = $respository->getClassName();
-        // $movies = $respository->count(['id' => 7]);
+    #[Route('/movies/create', name: 'create_movie',)]
+    public function create(Request $request): Response
+    {
+        $movie = new Movie;
+        $form = $this->createForm(MovieFormType::class, $movie);
 
-        // dd($movies);
+        $form->handleRequest($request);
 
-        return $this->render('index.html.twig');
+        if ($form->isSubmitted() && $form->isValid()) {
+            $newMovie = $form->getData();
+
+            $imagePath = $form->get('imagePath')->getData();
+
+            if ($imagePath) {
+                $newFileName = uniqid() . '.' . $imagePath->guessExtension();
+
+                try {
+                    $imagePath->move(
+                        $this->getParameter('kernel.project_dir') . '/public/uploads',
+                        $newFileName
+                    );
+                } catch (FileException $e) {
+                    return new Response($e->getMessage());
+                }
+
+                $newMovie->setImagePath('/uploads/' . $newFileName);
+            }
+
+            $this->em->persist($newMovie);
+            $this->em->flush();
+
+            return $this->redirectToRoute('movies');
+        }
+
+        return $this->render('movies/create.html.twig', [
+            'form' => $form->createView()
+        ]);
+    }
+
+    #[Route('/movies/edit/{id}', name: 'edit_movie',)]
+    public function edit($id, Request $request): Response
+    {
+        $movie = $this->movieRepository->find($id);
+        $form = $this->createForm(MovieFormType::class, $movie);
+
+        $form->handleRequest($request);
+        $imagePath = $form->get('imagePath')->getData();
+
+        if ($form->isSubmitted() && $form->isValid()) {
+            if ($imagePath) {
+                if ($movie->getImagePath() !== null) {
+                    if (file_exists($this->getParameter('kernel.project_dir') . $movie->getImagePath())) {
+                        $this->getParameter('kernel.project_dir') .  $movie->getImagePath();
+                    }
+
+                    $newFileName = uniqid() . '.' . $imagePath->guessExtension();
+
+                    try {
+                        $imagePath->move(
+                            $this->getParameter('kernel.project_dir') . '/public/uploads',
+                            $newFileName
+                        );
+                    } catch (FileException $e) {
+                        return new Response($e->getMessage());
+                    }
+
+                    $movie->setImagePath('/uploads/' . $newFileName);
+                    $this->em->flush();
+
+                    return $this->redirectToRoute('movies');
+                }
+            } else {
+                $movie->setTitle($form->get('title')->getData());
+                $movie->setReleaseYear($form->get('releaseYear')->getData());
+                $movie->setDescription($form->get('description')->getData());
+
+                $this->em->flush();
+                return $this->redirectToRoute('movies');
+            }
+        }
+
+        return $this->render('movies/edit.html.twig', [
+            'movie' => $movie,
+            'form' => $form->createView()
+        ]);
+    }
+
+    #[Route('/movies/{id}', methods: ['GET'], name: 'show_movie',)]
+    public function show($id): Response
+    {
+        $movie = $this->movieRepository->find($id);
+
+
+
+        return $this->render('movies/show.html.twig', [
+            'movie' => $movie
+        ]);
+    }
+
+    #[Route('/movies/delete/{id}', methods: ['GET', 'DELETE'], name: 'delete_movie',)]
+    public function delete($id): Response
+    {
+        $movie = $this->movieRepository->find($id);
+
+        $this->em->remove($movie);
+        $this->em->flush();
+
+        return $this->redirectToRoute('movies');
     }
 }

@@ -70,7 +70,7 @@ class MoviesController extends AbstractController
         }
 
         return $this->render('movies/create.html.twig', [
-            'form' => $form->createView()
+            'form' => $form
         ]);
     }
 
@@ -118,7 +118,7 @@ class MoviesController extends AbstractController
 
         return $this->render('movies/edit.html.twig', [
             'movie' => $movie,
-            'form' => $form->createView()
+            'form' => $form
         ]);
     }
 
